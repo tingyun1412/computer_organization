@@ -1,81 +1,92 @@
 .data
-	input_msg1:	.asciiz "Please enter the first number: "
-	input_msg2:	.asciiz "Please enter the second number: "
-	space:	.asciiz " "
-	newline:	.asciiz "\n"
+    input_msg1: .asciiz "Please enter the first number: "
+    input_msg2: .asciiz "Please enter the second number: "
+    space:      .asciiz " "
+    newline:    .asciiz "\n"
 
 .text
 .globl main
-#------------------------- main -----------------------------
+
 main:
-# print input_msg on the console interface
-	li      $v0, 4				# call system call: print string
-	la      $a0, input_msg1		# load address of string into $a0
-	syscall                 	# run the syscall
+    # input a
+    li      $v0, 4
+    la      $a0, input_msg1
+    syscall
 
-# read the input integer in $v0
-	li      $v0, 5          	# call system call: read integer
-	syscall                 	# run the syscall
-	move    $a0, $v0      		# store input in $a0 
+    li      $v0, 5
+    syscall
+    move    $s0, $v0  # Save the a to $s0
 
- # print input_msg on the console interface
-	li      $v0, 4				# call system call: print string
-	la      $a1, input_msg2		# load address of string into $a1
-	syscall                 	# run the syscall
- 
-# read the input integer in $v0
-	li      $v0, 5          	# call system call: read integer
-	syscall                 	# run the syscall
-	move    $a1, $v0      		# store input in $a0 (set arugument of procedure factorial)
+    # input b
+    li      $v0, 4
+    la      $a0, input_msg2
+    syscall
 
-# jump to procedure gcd
-	move $t0, $a0
-	move $t1, $a1
-	jal 	gcd
-	move 	$t0, $v0			# save return value in t0 (because v0 will be used by system call)
-	
-# jump to procedure gcd
-	jal 	lcm
-	move 	$t1, $v0			# save return value in t1 (because v0 will be used by system call)
+    li      $v0, 5
+    syscall
+    move    $s1, $v0  # Save the b to $s1
 
-# print the result of procedure factorial on the console interface
-	li      $v0, 1              # System call: print integer
-    move    $a0, $t2            # Load GCD result
-    syscall                     # Print GCD
-	li		$v0, 4				# call system call: print string
-	la		$a0, space		# load address of string into $a0
-	syscall						# run the syscall
-    li      $v0, 1              # Print integer
-    move    $a0, $t3            # Load LCM result
-    syscall                     # Print LCM					# run the syscall
+    # GCD
+    move    $a0, $s0
+    move    $a1, $s1
+    jal     gcd
+    move    $t0, $v0  # Save GCD to $t0
 
-# print a newline at the end
-	li		$v0, 4				# call system call: print string
-	la		$a0, newline		# load address of string into $a0
-	syscall						# run the syscall
+    move    $a0, $t0
+    li      $v0, 1 # print
+    syscall
 
-# exit the program
-	li 		$v0, 10				# call system call: exit
-	syscall						# run the syscall
+    li      $v0, 4
+    la      $a0, space
+    syscall
 
-#------------------------- procedure factorial -----------------------------
-# load a in $a0, b in $a1, return value in $v0. 
-.text
-gcd:	
-	beq  $t1, $zero, return_a	# if b == 0 go to return_a
-	move $t2, $a1                # Move b to $a2 (temp)
-    remu $t1, $t0, $t1           # a % b, result in $a1
-    move $t0, $t2                # Move original b to $a0
-    jal gcd                      # Recursive call to gcd(b, a % b)
-	jr 		$ra					# return to caller
-return_a:		
-	move $v0, $t0               # return a
-	jr 		$ra					# return to the caller
+    # LCM
+    move    $a0, $s0
+    move    $a1, $s1
+    jal     lcm
+    move    $t1, $v0  # Save LCM to $t1
+
+    move    $a0, $t1
+    li      $v0, 1 # print
+    syscall
+
+    li      $v0, 4
+    la      $a0, newline
+    syscall
+
+    # Exit program
+    li      $v0, 10
+    syscall
+
+gcd:
+    move    $t0, $a0
+    move    $t1, $a1
+gcd_loop:
+    beq     $t1, $zero, ret  # If b == 0, GCD is a
+    div     $t0, $t1              
+    mfhi    $t2                   # a % b
+    move    $t0, $t1              # Update a = b
+    move    $t1, $t2              # Update b = remainder
+    j       gcd_loop
+ret:
+    move    $v0, $t0              # Return GCD in $v0
+    jr      $ra
 
 lcm:
-	jal gcd
-	move $t0, $v0
-	mult $a3, $a0, $a1               # a*b 存入 $a3
-	div $a3, $t0                     # a*b /gcd(a,b)
-	mflo $v0                         # result 存入 $v0
-	jr 		$ra					     # return to caller
+    addi    $sp, $sp, -4
+    sw      $ra, 0($sp)           # Save return address
+    
+    add $t3, $a0, $zero	
+    add $t4, $a1, $zero
+    
+    jal     gcd
+    move    $t1, $v0
+    mult    $t3, $t4              # Compute a * b
+    mflo    $t0                   # Store the result in $t0
+    div     $t0, $t1              # LCM = (a * b) / GCD
+    mflo    $v0                   # Store LCM in $v0
+
+    lw      $ra, 0($sp)           # Restore return address
+    addi    $sp, $sp, 4
+    jr      $ra
+
